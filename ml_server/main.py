@@ -1,95 +1,84 @@
+import os
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import tensorflow as tf
 import numpy as np
 from PIL import Image
 import io
+from dotenv import load_dotenv
 
 # ---------------------------
-# 1️⃣ FastAPI setup
+# 1️⃣ Load .env
+# ---------------------------
+load_dotenv()
+
+HOST = os.getenv("ML_SERVER_HOST", "0.0.0.0")
+PORT = int(os.getenv("ML_SERVER_PORT", 8000))
+MODEL_PATH = os.getenv("MODEL_PATH", "saved_model/plant_disease_model.h5")
+CLASS_NAMES_PATH = os.getenv("CLASS_NAMES_PATH", "labels.txt")
+IMAGE_SIZE = int(os.getenv("IMAGE_SIZE", 224))
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+
+# ---------------------------
+# 2️⃣ FastAPI setup
 # ---------------------------
 app = FastAPI(title="Plant Disease Detection API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ---------------------------
-# 2️⃣ Load Keras model (.h5)
+# 3️⃣ Load Keras model
 # ---------------------------
 print("Loading model...")
-model = tf.keras.models.load_model("saved_model/plant_disease_model.h5")
+model = tf.keras.models.load_model(MODEL_PATH)
 print("Model loaded successfully.")
 
 # Load class labels
 labels = {}
-with open("labels.txt", "r") as f:
+with open(CLASS_NAMES_PATH, "r") as f:
     for idx, line in enumerate(f):
         labels[idx] = line.strip()
 
 # ---------------------------
-# 3️⃣ Image preprocessing
+# 4️⃣ Image preprocessing
 # ---------------------------
-IMAGE_SIZE = (224, 224)
-
 def preprocess_image(image_bytes):
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    image = image.resize(IMAGE_SIZE)
+    image = image.resize((IMAGE_SIZE, IMAGE_SIZE))
     image_array = np.array(image) / 255.0
     image_array = np.expand_dims(image_array, axis=0)
     return image_array
 
 # ---------------------------
-# 4️⃣ Health check endpoint
+# 5️⃣ Health check
 # ---------------------------
 @app.get("/")
 def health_check():
     return {"status": "ML Server Running"}
 
 # ---------------------------
-# 5️⃣ Prediction endpoint with crop filtering
+# 6️⃣ Prediction endpoint
 # ---------------------------
 @app.post("/predict")
-async def predict(
-    file: UploadFile = File(...),
-    crop: str = Form(...)
-):
-    """
-    crop = user selected crop (apple, potato, corn...)
-    """
-
+async def predict(file: UploadFile = File(...), crop: str = Form(...)):
     try:
-        # Read image
         image_bytes = await file.read()
         img_array = preprocess_image(image_bytes)
-
-        # Model prediction
         predictions = model.predict(img_array)[0]
 
-        # ---------------------------
-        # Filter classes by crop name
-        # ---------------------------
         crop = crop.lower().strip()
-
-        filtered_indices = [
-            idx for idx, name in labels.items()
-            if name.lower().startswith(crop)
-        ]
+        filtered_indices = [idx for idx, name in labels.items() if name.lower().startswith(crop)]
 
         if not filtered_indices:
-            return {
-                "success": False,
-                "error": f"No matching classes found for crop '{crop}'."
-            }
+            return {"success": False, "error": f"No matching classes found for crop '{crop}'."}
 
-        # Filter predictions
         filtered_scores = predictions[filtered_indices]
-
-        # Best class among selected crop
         best_local_index = int(np.argmax(filtered_scores))
         best_global_index = filtered_indices[best_local_index]
 
@@ -104,14 +93,11 @@ async def predict(
         }
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 # ---------------------------
-# 6️⃣ Run server
+# 7️⃣ Run server
 # ---------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=HOST, port=PORT)
