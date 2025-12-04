@@ -1,7 +1,7 @@
 import express from 'express';
 import { getProfile, updateProfile, changePassword,deleteProfilePhoto, uploadProfilePhoto} from '../controllers/user.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
-import { uploadSingle } from '../middleware/upload.middleware.js';
+import { uploadProfilePhoto as uploadProfilePhotoMiddleware } from '../middleware/upload.middleware.js';
 
 
 const router = express.Router();
@@ -11,7 +11,7 @@ router.use(protect);
 router.get('/me', getProfile);
 router.put('/update', updateProfile);
 router.put('/change-password', changePassword);
-router.post('/upload-photo', uploadSingle('photo'), uploadProfilePhoto);
+router.post('/upload-photo', uploadProfilePhotoMiddleware('photo'), uploadProfilePhoto);
 router.delete('/delete-photo', deleteProfilePhoto);
 
 

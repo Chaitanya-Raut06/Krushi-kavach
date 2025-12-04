@@ -27,3 +27,10 @@ export const deleteCrop = asyncHandler(async (req, res) => {
   await crop.deleteOne();
   res.json({ message: 'Crop deleted' });
 });
+
+// --- Get Crops by Farmer ID (for Agronomist) ---
+export const getCropsByFarmer = asyncHandler(async (req, res) => {
+  const { farmerId } = req.params;
+  const crops = await Crop.find({ farmer: farmerId }).populate('farmer', 'fullName');
+  res.json(crops);
+});

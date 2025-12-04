@@ -2,11 +2,25 @@ import asyncHandler from 'express-async-handler';
 import User from '../models/user.model.js';
 import Media from '../models/media.model.js';
 import AgronomistProfile from '../models/agronomistProfile.model.js';
-import Location from '../models/location.model.js';
+import { deleteFromCloudinary } from '../services/cloudinary.service.js';
+
+const removeMediaById = async (mediaId) => {
+  if (!mediaId) return;
+  const media = await Media.findById(mediaId);
+  if (!media) return;
+  if (media.publicId) {
+    try {
+      await deleteFromCloudinary(media.publicId);
+    } catch (err) {
+      console.error('Failed to delete media from Cloudinary:', err.message);
+    }
+  }
+  await media.deleteOne();
+};
 
 // --- List All Farmers ---
 export const listFarmers = asyncHandler(async (req, res) => {
-  const farmers = await User.find({ role: 'farmer' });
+  const farmers = await User.find({ role: 'farmer' }).select('-passwordHash').sort({ createdAt: -1 });
   res.json(farmers);
 });
 
@@ -14,48 +28,46 @@ export const listFarmers = asyncHandler(async (req, res) => {
 export const listAgronomists = asyncHandler(async (req, res) => {
   // Chain all .populate() calls together in a single statement
   const agronomists = await AgronomistProfile.find()
-    .populate('user', 'fullName mobileNumber address') // Populates specific fields from the user document
-    .populate('idProof', 'url');                      // Populates the URL from the idProof media document
+    .populate('user', 'fullName mobileNumber address profilePhoto')
+    .populate('idProof', 'url contentType');
 
   res.status(200).json(agronomists);
 });
 
-// --- Assign Locations to Agronomist ---
-export const assignLocations = asyncHandler(async (req, res) => {
-  // 1. Expect an array of location objects, not IDs.
-  const { locations } = req.body; // e.g., [{ district: 'Pune', taluka: 'Haveli' }]
-
-  if (!locations || !Array.isArray(locations) || locations.length === 0) {
-    return res.status(400).json({ message: 'Please provide a valid array of locations.' });
+// --- Delete Farmer ---
+export const deleteFarmer = asyncHandler(async (req, res) => {
+  const farmer = await User.findOne({ _id: req.params.id, role: 'farmer' });
+  if (!farmer) {
+    return res.status(404).json({ message: 'Farmer not found' });
   }
 
-  const agronomist = await User.findById(req.params.id);
+  if (farmer.profilePhoto) {
+    await removeMediaById(farmer.profilePhoto);
+  }
 
+  await farmer.deleteOne();
+  res.json({ message: 'Farmer deleted successfully' });
+});
+
+// --- Delete Agronomist ---
+export const deleteAgronomist = asyncHandler(async (req, res) => {
+  const agronomist = await User.findOne({ _id: req.params.id, role: 'agronomist' });
   if (!agronomist) {
-    return res.status(404).json({ message: 'Agronomist not found with this ID' });
+    return res.status(404).json({ message: 'Agronomist not found' });
   }
 
-  // 2. Create a query to find all matching locations in a single database call.
-  const locationQuery = locations.map(loc => ({
-    district: loc.district,
-    taluka: loc.taluka,
-  }));
-
-  const foundLocations = await Location.find({ $or: locationQuery });
-
-  // 3. Error handling: Check if all requested locations were found.
-  if (foundLocations.length !== locations.length) {
-    return res.status(404).json({
-      message: 'One or more specified locations do not exist. Please create them first.',
-    });
+  const profile = await AgronomistProfile.findOne({ user: agronomist._id });
+  if (profile) {
+    if (profile.idProof) {
+      await removeMediaById(profile.idProof);
+    }
+    await profile.deleteOne();
   }
 
-  // 4. Extract the _id from each found location document.
-  const locationIds = foundLocations.map(loc => loc._id);
+  if (agronomist.profilePhoto) {
+    await removeMediaById(agronomist.profilePhoto);
+  }
 
-  // 5. Assign the array of ObjectIDs to the agronomist.
-  agronomist.assignedLocations = locationIds;
-  await agronomist.save();
-
-  res.json(agronomist);
+  await agronomist.deleteOne();
+  res.json({ message: 'Agronomist deleted successfully' });
 });

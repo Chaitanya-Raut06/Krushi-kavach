@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import LanguageGuard from './components/LanguageGuard';
 import Navbar from './components/Navbar';
 
 // Pages
@@ -21,7 +22,6 @@ import Advisories from './pages/farmer/Advisories';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Farmers from './pages/admin/Farmers';
 import Agronomists from './pages/admin/Agronomists';
-import Locations from './pages/admin/Locations';
 
 // Agronomist Pages
 import AgronomistDashboard from './pages/agronomist/AgronomistDashboard';
@@ -29,11 +29,12 @@ import AgronomistProfile from './pages/agronomist/AgronomistProfile';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <Navbar />
-          <Routes>
+    <LanguageGuard>
+      <AuthProvider>
+        <Router>
+          <div className="min-h-screen bg-gray-50">
+            <Navbar />
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
@@ -126,14 +127,6 @@ function App() {
               }
             />
             <Route
-              path="/admin/locations"
-              element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <Locations />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/admin/profile"
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
@@ -160,16 +153,20 @@ function App() {
               }
             />
 
-            {/* Catch all - redirect to home */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </div>
-      </Router>
-    </AuthProvider>
+              {/* Catch all - redirect to home */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
+        </Router>
+      </AuthProvider>
+    </LanguageGuard>
   );
 }
 
 export default App;
+
+
+
 
 
 

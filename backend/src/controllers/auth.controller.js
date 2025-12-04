@@ -8,6 +8,13 @@ import Media from '../models/media.model.js';
 import { uploadToCloudinary } from '../services/cloudinary.service.js';
 import { generateTokens } from '../services/auth.service.js';
 
+const sanitizeUser = (userDoc) => {
+  if (!userDoc) return null;
+  const userObj = userDoc.toObject();
+  delete userObj.passwordHash;
+  return userObj;
+};
+
 // --- Registration (Farmer / Agronomist / Admin) ---
 export const register = asyncHandler(async (req, res) => {
   const {
@@ -24,25 +31,17 @@ export const register = asyncHandler(async (req, res) => {
     latitude,
   } = req.body;
 
+  // Prevent registration of admin accounts - admin must be created via initialization
+  if (role === 'admin') {
+    return res.status(400).json({
+      message: 'Admin accounts cannot be registered through this endpoint.',
+    });
+  }
+
   // Check if user already exists
   const existing = await User.findOne({ mobileNumber });
   if (existing) {
     return res.status(400).json({ message: 'Mobile number is already registered.' });
-  }
-
-  // --- ADMIN HARDCODED LOGIC ---
-  if (mobileNumber === '8446595203') {
-    const adminUser = await User.create({
-      fullName: fullName || 'Super Admin',
-      mobileNumber,
-      passwordHash: 'chaitanya@123it', // ✅ FIX: still works, model will hash
-      role: 'admin',
-      language: language || 'en',
-    });
-
-    const cleanAdmin = adminUser.toObject();
-    delete cleanAdmin.passwordHash;
-    return res.status(201).json({ message: 'Admin registered successfully', user: cleanAdmin });
   }
 
   // Build location object if provided
@@ -95,15 +94,12 @@ export const register = asyncHandler(async (req, res) => {
     }
   }
 
-  const userResponse = user.toObject();
-  delete userResponse.passwordHash;
-
   res.status(201).json({
     message:
       role === 'agronomist'
         ? 'Registration successful. Your profile is now pending verification.'
         : 'Registered successfully.',
-    user: userResponse,
+    user: sanitizeUser(user),
   });
 });
 
@@ -114,7 +110,7 @@ export const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ mobileNumber });
   if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
-  // ✅ FIX: compare against passwordHash (model handles it)
+  // Compare password
   const isMatch = await user.matchPassword(password);
   if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
@@ -126,8 +122,8 @@ export const login = asyncHandler(async (req, res) => {
       const message =
         profile?.status === 'rejected'
           ? 'Your application has been rejected. Please contact support.'
-          : 'Your profile is still pending verification by an administrator.';
-      return res.status(403).json({ message: `Access Denied. ${message}` });
+          : 'Your account is waiting for admin approval.';
+      return res.status(403).json({ message });
     }
   }
 
@@ -140,13 +136,7 @@ export const login = asyncHandler(async (req, res) => {
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   });
 
-  user.lastLoginAt = new Date();
-  await user.save();
-
-  const userResponse = user.toObject();
-  delete userResponse.passwordHash;
-
-  res.json({ accessToken, refreshToken, user: userResponse });
+  res.json({ accessToken, refreshToken, user: sanitizeUser(user) });
 });
 
 // --- Refresh Token ---
@@ -155,6 +145,7 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
   try {
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+
     const session = await AuthSession.findOne({ user: payload.userId });
     if (!session) return res.status(401).json({ message: 'Session not found' });
 

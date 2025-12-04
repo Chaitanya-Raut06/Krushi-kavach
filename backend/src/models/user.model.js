@@ -43,6 +43,11 @@ const userSchema = new mongoose.Schema(
       district: { type: String, trim: true },
       taluka: { type: String, trim: true },
     },
+    language: {
+      type: String,
+      default: 'en',
+      enum: ['en', 'hi', 'mr'],
+    },
   },
   { timestamps: true }
 );

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { weatherAPI } from '../../services/api';
 import { userAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const Weather = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [weather, setWeather] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -91,9 +93,9 @@ const Weather = () => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     
     if (date.toDateString() === today.toDateString()) {
-      return 'Today';
+      return t('weather.today');
     } else if (date.toDateString() === tomorrow.toDateString()) {
-      return 'Tomorrow';
+      return t('weather.tomorrow');
     } else {
       return date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
     }
@@ -109,7 +111,7 @@ const Weather = () => {
       const response = await weatherAPI.getWeather();
       setWeather(response.data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch weather data. Please ensure your profile has a valid farm location.');
+      setError(err.response?.data?.message || t('weather.failed'));
     } finally {
       setLoading(false);
     }
@@ -445,8 +447,8 @@ const Weather = () => {
       `}</style>
 
       <div className="weather-header">
-        <h1 className="weather-title">🌾 Farm Weather Information</h1>
-        <p className="weather-subtitle">Current weather conditions and 7-day forecast for your farm</p>
+        <h1 className="weather-title">🌾 {t('weather.title')}</h1>
+        <p className="weather-subtitle">{t('weather.subtitle')}</p>
         {userLocation && (
           <div className="location-badge">
             🌍 {userLocation.district}, {userLocation.taluka}
@@ -458,14 +460,14 @@ const Weather = () => {
             disabled={loading}
             className="refresh-button"
           >
-            {loading ? '🔄 Refreshing...' : '🔄 Refresh Weather'}
+            {loading ? `🔄 ${t('weather.refreshing')}` : `🔄 ${t('weather.refresh')}`}
           </button>
         </div>
       </div>
 
       {loading && (
         <div className="loading-container">
-          ⏳ Fetching weather data for your farm location...
+          ⏳ {t('weather.fetching')}
         </div>
       )}
 
@@ -489,13 +491,13 @@ const Weather = () => {
               </div>
               <div className="temperature-display">
                 <div className="temperature-main">{currentWeather.temperature}°C</div>
-                <div className="temperature-feels-like">Feels like {currentWeather.feelsLike}°C</div>
+                <div className="temperature-feels-like">{t('weather.feelsLike')} {currentWeather.feelsLike}°C</div>
               </div>
             </div>
 
             <div className="weather-details-grid">
               <div className="weather-detail-item">
-                <div className="weather-detail-label">💧 Humidity</div>
+                <div className="weather-detail-label">💧 {t('weather.humidity')}</div>
                 <div className="weather-detail-value">
                   {currentWeather.humidity}
                   <span className="weather-detail-unit">%</span>
@@ -503,7 +505,7 @@ const Weather = () => {
               </div>
 
               <div className="weather-detail-item">
-                <div className="weather-detail-label">💨 Wind Speed</div>
+                <div className="weather-detail-label">💨 {t('weather.windSpeed')}</div>
                 <div className="weather-detail-value">
                   {currentWeather.windSpeed}
                   <span className="weather-detail-unit"> km/h</span>
@@ -511,7 +513,7 @@ const Weather = () => {
               </div>
 
               <div className="weather-detail-item">
-                <div className="weather-detail-label">🌧️ Precipitation</div>
+                <div className="weather-detail-label">🌧️ {t('weather.precipitation')}</div>
                 <div className="weather-detail-value">
                   {currentWeather.precipitation.toFixed(1)}
                   <span className="weather-detail-unit"> mm</span>
@@ -519,7 +521,7 @@ const Weather = () => {
               </div>
 
               <div className="weather-detail-item">
-                <div className="weather-detail-label">🕐 Updated</div>
+                <div className="weather-detail-label">🕐 {t('weather.updated')}</div>
                 <div className="weather-detail-value" style={{ fontSize: '1rem' }}>
                   {new Date(currentWeather.time).toLocaleTimeString('en-IN', { 
                     hour: '2-digit', 
@@ -533,7 +535,7 @@ const Weather = () => {
           {/* 7-Day Forecast */}
           {dailyForecast.length > 0 && (
             <div className="forecast-section">
-              <h2 className="forecast-title">📅 7-Day Weather Forecast</h2>
+              <h2 className="forecast-title">📅 {t('weather.forecastTitle')}</h2>
               <div className="forecast-grid">
                 {dailyForecast.map((day, index) => {
                   const dayWeather = getWeatherDescription(day.weatherCode);
@@ -559,7 +561,7 @@ const Weather = () => {
                       )}
                       {day.precipitationProbability > 0 && (
                         <div className={`forecast-precipitation ${precipClass}`}>
-                          💧 {day.precipitationProbability}% chance
+                          💧 {day.precipitationProbability}% {t('weather.chance')}
                         </div>
                       )}
                     </div>
@@ -573,7 +575,7 @@ const Weather = () => {
 
       {!weather && !loading && !error && (
         <div className="error-container">
-          No weather data available. Please ensure your profile has a valid farm location.
+          {t('weather.noData')}
         </div>
       )}
     </div>

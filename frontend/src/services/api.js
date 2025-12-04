@@ -29,6 +29,8 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Only handle 401 (Unauthorized) errors, not 403 (Forbidden)
+    // 403 errors should be handled by the component, not cause logout
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -44,6 +46,7 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
       } catch (refreshError) {
+        // Only logout if refresh truly fails
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
@@ -52,6 +55,8 @@ api.interceptors.response.use(
       }
     }
 
+    // For 403 errors, don't log out - just reject the error
+    // Components should handle 403 errors appropriately
     return Promise.reject(error);
   }
 );
@@ -95,6 +100,7 @@ export const cropAPI = {
   getCrops: () => api.get('/crops'),
   addCrop: (data) => api.post('/crops', data),
   deleteCrop: (id) => api.delete(`/crops/${id}`),
+  getCropsByFarmer: (farmerId) => api.get(`/crops/farmer/${farmerId}`),
 };
 
 // Disease Report APIs
@@ -112,7 +118,16 @@ export const diseaseReportAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  detectDisease: (cropName, file) => {
+    const formData = new FormData();
+    formData.append('cropName', cropName);
+    formData.append('file', file);
+    return api.post('/disease-reports/detect', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   markTreated: (id) => api.put(`/disease-reports/${id}/mark-treated`),
+  deleteReport: (id) => api.delete(`/disease-reports/${id}`),
 };
 
 // Agronomist APIs
@@ -121,19 +136,15 @@ export const agronomistAPI = {
   updateProfile: (data) => api.put('/agronomists/me', data),
   verifyAgronomist: (id, status = 'verified') => api.put(`/agronomists/${id}/verify`, { status }),
   findLocalExperts: () => api.get('/agronomists/local'),
+  findLocalFarmers: () => api.get('/agronomists/farmers'),
 };
 
 // Admin APIs
 export const adminAPI = {
   listFarmers: () => api.get('/admin/farmers'),
+  deleteFarmer: (id) => api.delete(`/admin/farmers/${id}`),
   listAgronomists: () => api.get('/admin/agronomists'),
-  assignLocations: (id, locations) => api.put(`/admin/agronomist/${id}/assign-locations`, { locations }),
-};
-
-// Location APIs
-export const locationAPI = {
-  listLocations: () => api.get('/locations'),
-  addLocation: (data) => api.post('/locations', data),
+  deleteAgronomist: (id) => api.delete(`/admin/agronomists/${id}`),
 };
 
 // Weather APIs
@@ -144,6 +155,11 @@ export const weatherAPI = {
 // Advisory APIs
 export const advisoryAPI = {
   getAdvisories: () => api.get('/advisories'),
+};
+
+// ML Server APIs
+export const mlServerAPI = {
+  getStatus: () => api.get('/ml-server/status'),
 };
 
 // Media APIs

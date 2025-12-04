@@ -3,11 +3,16 @@ import mongoose from 'mongoose';
 const diseaseReportSchema = new mongoose.Schema(
   {
     farmer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    crop: { type: mongoose.Schema.Types.ObjectId, ref: 'Crop', required: true },
+    crop: { type: mongoose.Schema.Types.ObjectId, ref: 'Crop' }, // Made optional for ML predictions
     images: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Media' }],
-      validate: [(val) => val.length > 0, 'At least one image is required for a report.'],
     },
+    // ML Prediction fields
+    imageURL: { type: String }, // Cloudinary URL for ML predictions
+    cropName: { type: String }, // Crop name for ML predictions (e.g., "apple", "tomato")
+    prediction: { type: String }, // Disease name from ML (or "Healthy")
+    confidence: { type: Number }, // Confidence percentage (0-100)
+    // Existing fields
     detectedDisease: { type: String },
     diagnosis: { type: String },
     recommendation: { type: String },

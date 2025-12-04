@@ -1,25 +1,40 @@
 import asyncHandler from 'express-async-handler';
 import User from '../models/user.model.js';
 import Media from '../models/media.model.js';
-import { uploadToCloudinary ,deleteFromCloudinary} from '../services/cloudinary.service.js';
+import { uploadToCloudinary, deleteFromCloudinary } from '../services/cloudinary.service.js';
 import bcrypt from 'bcryptjs';
 // import cloudinary from "../config/cloudinary.js";
+
+const sanitizeUser = (userDoc) => {
+  if (!userDoc) return null;
+  const userObj = userDoc.toObject ? userDoc.toObject() : userDoc;
+  delete userObj.passwordHash;
+  return userObj;
+};
 
 // --- Get Profile ---
 export const getProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).populate('profilePhoto');
-  res.json(user);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+  res.json(sanitizeUser(user));
 });
 
 // --- Update Personal Info ---
 export const updateProfile = asyncHandler(async (req, res) => {
   const { fullName, district, taluka, language } = req.body;
+  
   const user = await User.findByIdAndUpdate(req.user.id, {
     fullName,
     address: { district, taluka },
     language,
-  }, { new: true });
-  res.json(user);
+  }, { new: true }).populate('profilePhoto');
+  
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+  res.json(sanitizeUser(user));
 });
 
 // --- Upload Profile Picture ---
@@ -30,18 +45,37 @@ export const uploadProfilePhoto = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findById(req.user.id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
 
   // If user already has a photo, delete the old one from Cloudinary
   if (user.profilePhoto) {
     const oldMedia = await Media.findById(user.profilePhoto);
     if (oldMedia && oldMedia.publicId) {
-      await deleteFromCloudinary(oldMedia.publicId);
+      try {
+        await deleteFromCloudinary(oldMedia.publicId);
+      } catch (err) {
+        console.error('Error deleting old photo from Cloudinary:', err);
+      }
       await oldMedia.deleteOne();
     }
   }
 
   // Upload the new file to Cloudinary
-  const result = await uploadToCloudinary(req.file, 'profile_photos');
+  let result;
+  try {
+    result = await uploadToCloudinary(req.file, 'profile_photos');
+  } catch (uploadError) {
+    console.error('Cloudinary upload failed:', uploadError);
+    return res.status(500).json({ 
+      message: uploadError.message || 'Failed to upload photo to Cloudinary. Please check your network connection and Cloudinary configuration.' 
+    });
+  }
+
+  if (!result || !result.secure_url) {
+    return res.status(500).json({ message: 'Upload succeeded but no URL was returned from Cloudinary' });
+  }
 
   // Create a new media document in MongoDB
   const media = await Media.create({
@@ -55,13 +89,17 @@ export const uploadProfilePhoto = asyncHandler(async (req, res) => {
   // Link the new media to the user and save
   user.profilePhoto = media._id;
   await user.save();
+  await user.populate('profilePhoto');
 
-  res.json({ message: 'Profile photo updated successfully', user });
+  res.json({ message: 'Profile photo updated successfully', user: sanitizeUser(user) });
 });
 
 // --- Delete Profile Photo ---
 export const deleteProfilePhoto = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
 
   if (!user.profilePhoto) {
     return res.status(400).json({ message: 'No profile photo to delete' });
@@ -71,24 +109,35 @@ export const deleteProfilePhoto = asyncHandler(async (req, res) => {
 
   // Delete from Cloudinary and then from MongoDB
   if (media && media.publicId) {
-    await deleteFromCloudinary(media.publicId);
+    try {
+      await deleteFromCloudinary(media.publicId);
+    } catch (err) {
+      console.error('Error deleting photo from Cloudinary:', err);
+    }
     await media.deleteOne();
   }
 
   user.profilePhoto = undefined;
   await user.save();
+  await user.populate('profilePhoto');
 
-  res.json({ message: 'Profile photo deleted successfully', user });
+  res.json({ message: 'Profile photo deleted successfully', user: sanitizeUser(user) });
 });
 
 
 // --- Change Password ---
 export const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
+  
   const user = await User.findById(req.user.id);
-  const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+  
+  const isMatch = await user.matchPassword(currentPassword);
   if (!isMatch) return res.status(400).json({ message: 'Current password incorrect' });
 
+  // Update password (will be hashed by pre-save hook)
   user.passwordHash = newPassword;
   await user.save();
   res.json({ message: 'Password changed successfully' });

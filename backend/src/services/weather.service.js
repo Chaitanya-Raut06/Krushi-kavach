@@ -17,8 +17,10 @@ export const getWeatherData = async (lat, lon, lang = 'en') => {
         longitude: lon,
         // Request current weather and key agricultural data
         current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m',
-        // Request daily forecast data for the next 7 days
+        // Request daily forecast data for today and next 7 days (8 days total)
         daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max',
+        // Set forecast days to 8 (today + next 7 days)
+        forecast_days: 8,
         timezone: 'auto', // Automatically detect timezone for accurate daily forecasts
         language: lang     // Added to support language parameter from controller
       },

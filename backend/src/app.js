@@ -12,10 +12,10 @@ import cropRoutes from './routes/crop.routes.js';
 import diseaseReportRoutes from './routes/diseaseReport.routes.js';
 import agronomistRoutes from './routes/agronomist.routes.js';
 import adminRoutes from './routes/admin.routes.js';
-import locationRoutes from './routes/location.routes.js';
 import mediaRoutes from './routes/media.routes.js';
 import weatherRoutes from './routes/weather.routes.js';
 import advisoryRoutes from './routes/advisory.routes.js';
+import mlServerRoutes from './routes/mlServer.routes.js';
 
 // --- Import Error Middleware ---
 import { errorHandler } from './middleware/error.middleware.js';
@@ -34,8 +34,8 @@ app.use(cors({
 }));
 app.use(morgan('dev'));
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // --- Health Check Endpoint ---
 app.get('/api/v1/health', (req, res) => {
@@ -49,10 +49,10 @@ app.use('/api/v1/crops', cropRoutes);
 app.use('/api/v1/disease-reports', diseaseReportRoutes);
 app.use('/api/v1/agronomists', agronomistRoutes);
 app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/locations', locationRoutes);
 app.use('/api/v1/media', mediaRoutes);
 app.use('/api/v1/weather', weatherRoutes);
 app.use('/api/v1/advisories', advisoryRoutes);
+app.use('/api/v1/ml-server', mlServerRoutes);
 
 
 // --- Error Middleware ---
