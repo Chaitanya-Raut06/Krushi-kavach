@@ -26,10 +26,25 @@ dotenv.config();
 // --- Initialize Express ---
 const app = express();
 
+// --- Allowed origins for CORS ---
+const allowedOrigins = [
+  process.env.CLIENT_URL || 'http://localhost:3000',
+  'https://krushikavach.netlify.app'
+];
+
 // --- Core Middleware ---
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000'||"https://krushikavach.netlify.app/",
+  origin: function(origin, callback) {
+    // allow requests with no origin (e.g., Postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = `CORS policy does not allow access from ${origin}`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
 }));
 app.use(morgan('dev'));
@@ -54,6 +69,10 @@ app.use('/api/v1/weather', weatherRoutes);
 app.use('/api/v1/advisories', advisoryRoutes);
 app.use('/api/v1/ml-server', mlServerRoutes);
 
+// --- 404 Handler for unknown routes ---
+app.use((req, res, next) => {
+  res.status(404).json({ message: 'Route not found' });
+});
 
 // --- Error Middleware ---
 app.use(errorHandler);
