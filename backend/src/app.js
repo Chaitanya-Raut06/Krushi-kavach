@@ -29,7 +29,8 @@ const app = express();
 // --- Allowed origins for CORS ---
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:3000',
-  'https://krushikavach.netlify.app'
+  'https://krushikavach.netlify.app',
+  'http://localhost:3000'
 ];
 
 // --- Core Middleware ---
