@@ -10,30 +10,37 @@ const ML_SERVER_URL = process.env.ML_SERVER_URL ||
 export const checkMLServerStatus = async () => {
   try {
     const res = await axios.get(`${ML_SERVER_URL}/`, {
-      timeout: 3000
+      timeout: 15000  // 🔥 allow Render cold start (15 seconds)
     });
 
-    return res.status === 200;
+    if (res.status === 200) {
+      const status = String(res.data?.status || "").toLowerCase();
+      return status.includes("running");
+    }
+
+    return false;
   } catch (err) {
-    return false; // Render ML is sleeping or cold starting
+    return false;
   }
 };
+
 
 // ----------------------------------------------------------------------
 // 2️⃣ Wait until Render wakes from sleep (cold start handler)
 // ----------------------------------------------------------------------
-export const waitForMLServer = async (maxWait = 60000) => {
+export const waitForMLServer = async (maxWait = 45000) => {
   const start = Date.now();
 
   while (Date.now() - start < maxWait) {
     const alive = await checkMLServerStatus();
     if (alive) return true;
 
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 2000)); // 2 sec interval
   }
 
   return false;
 };
+
 
 // ----------------------------------------------------------------------
 // 3️⃣ "Start" ML server on Render
@@ -42,7 +49,7 @@ export const waitForMLServer = async (maxWait = 60000) => {
 export const startMLServer = async () => {
   console.log("Waking ML server on Render...");
 
-  const ready = await waitForMLServer();
+  const ready = await waitForMLServer(45000);  // wait up to 45s
 
   if (!ready) {
     throw new Error("ML server not waking up (Render cold start timeout)");
@@ -50,6 +57,7 @@ export const startMLServer = async () => {
 
   console.log("ML server is awake.");
 };
+
 
 // ----------------------------------------------------------------------
 // 4️⃣ Predict function (Node → Render ML → Node → Frontend)
